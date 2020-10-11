@@ -16,14 +16,14 @@ config = configparser.ConfigParser()
 config.read("mainconfig.cfg")
 print(f'[LOG] {str(t.now())} | LOADING: LOADED CONGIF FILE')
 
-TOKEN = config['BOT']['TOKEN']
+TOKEN = config['BOT']['TESTTOKEN']
 CRASHREPORT = config['BOT']['CRASHREPORT']
 adminpass = config['BOT']['ADMINPASS']
 
 print(f'[LOG] {str(t.now())} | LOADING: CURRENT TOKEN: {TOKEN}')
 
 bot = telebot.TeleBot(TOKEN)
-crashreport = telebot.TeleBot(TOKEN)
+crashreport = telebot.TeleBot(CRASHREPORT)
 
 print(f'[LOG] {str(t.now())} | LOADING: ADMINPASS: {adminpass}')
 
@@ -41,6 +41,23 @@ def callback_inline(call):
         if call.data == "remsubj":
             bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Следуйте пунктам:")
             delete_query(call.message)
+        if call.data == "addschedule":
+            bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Следуйте пунктам:")
+            schedule_task(call.message)
+        if call.data == "remschedule":
+            bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text="Следуйте пунктам:")
+            stop_schedule(call.message)
+
+@bot.message_handler(commands=['report'])
+def bugreport(message):
+    bot.send_message(message.chat.id, 'Вкратце опишите свою проблему: ')
+    bot.register_next_step_handler(message, report)
+
+def report(message):
+    print(f'[LOG] {str(t.now())} | @{message.from_user.username} -REPORT-> {message.text}')
+    crashreport.send_message(config['BOT']['OWNERID'], f'@{message.from_user.username} reported a problem:\n{message.text}\n\nDetails: Bot: Регистрация на Лабораторные. \nTime: {str(t.now())}. \nCheck your log file!')
+    
+    bot.send_message(message.chat.id, 'Спасибо! Ваше сообщение отправлено!')
 
 @bot.message_handler(commands=['stop'])
 def stop_schedule(message):
@@ -182,7 +199,11 @@ def admin(message):
     add_button = types.InlineKeyboardButton(text="Добавить предмет", callback_data='addsubj')
     keyboard.add(add_button)
     remove_button = types.InlineKeyboardButton(text="Удалить предмет", callback_data='remsubj')
-    keyboard.add(add_button)
+    keyboard.add(remove_button)
+    schedule_button = types.InlineKeyboardButton(text="Создать расписание", callback_data='addschedule')
+    keyboard.add(schedule_button)
+    remove_schedule_button = types.InlineKeyboardButton(text="Удалить пункт расписания", callback_data='remschedule')
+    keyboard.add(remove_schedule_button)
     bot.send_message(message.chat.id, 'Выберите пункт:', reply_markup=keyboard)
 
 @bot.message_handler(commands=['new', 'add', 'create', 'open', 'regopen', 'overwrite'])
@@ -254,7 +275,7 @@ def delete_query_group_input(message):
     keyboard = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
     with open('query.json', 'r') as f:
         data = json.load(f)
-    if str(message.text) not in data or data[str(message.text)] == None:
+    if str(message.text) not in data or data[str(message.text)] == {} or data[str(message.text)] == None:
         keyboard = types.ReplyKeyboardRemove()
         bot.send_message(message.chat.id, f'Для группы {message.text} не найдена открытая очередь регистрации', reply_markup=keyboard)
         return 
@@ -304,7 +325,7 @@ def get_query_name(message):
     keyboard = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
     with open('query.json', 'r') as f:
         data = json.load(f)
-    if str(message.text) not in data or data[str(message.text)] == None:
+    if str(message.text) not in data or data[str(message.text)] == {} or data[str(message.text)] == None:
         keyboard = types.ReplyKeyboardRemove()
         bot.send_message(message.chat.id, f'Для группы {message.text} не найдена открытая очередь регистрации', reply_markup=keyboard)
         return 
@@ -352,7 +373,7 @@ def subj_input(message):
     keyboard = types.ReplyKeyboardMarkup(row_width=1, resize_keyboard=True)
     with open('query.json', 'r') as f:
         data = json.load(f)
-    if str(message.text) not in data or data[str(message.text)] == None:
+    if str(message.text) not in data or data[str(message.text)] == {} or data[str(message.text)] == None:
         keyboard = types.ReplyKeyboardRemove()
         bot.send_message(message.chat.id, f'Для группы {message.text} не найдена открытая очередь регистрации', reply_markup=keyboard)
         return 
@@ -453,4 +474,5 @@ def removal(message, group):
     print(f"[LOG] {str(t.now())} | @{message.chat.username} -> {group}. Finished removal")
     bot.send_message(message.chat.id, 'Вы были исключены из очереди!', reply_markup=keyboard)
 
-bot.polling()
+bot.polling(none_stop=True)
+crashreport.polling(none_stop=True)
